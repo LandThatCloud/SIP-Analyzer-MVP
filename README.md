@@ -35,10 +35,10 @@ pip install streamlit pyshark pandas
 ### Running the app
 
 ```bash
-streamlit run app.py
+streamlit run sip_analyzer_mvp.py
 ```
 
-Replace `app.py` with the filename of your script.
+Replace `sip_analyzer_mvp.py` with the filename of your script.
 
 ---
 
@@ -69,7 +69,7 @@ Contributions and suggestions are welcome! Feel free to open issues or submit pu
 
 ## License
 
-MIT License © 2025 Your Name
+MIT License © 2025 Ram Ramaiyah
 
 ---
 
