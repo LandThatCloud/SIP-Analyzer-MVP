@@ -1,18 +1,28 @@
 # SIP & RTP Analyzer (MBG/MiVB PCAP Inspector)
 
-A Streamlit web app to analyze SIP signaling and RTP streams from PCAP or PCAPNG files.  
-Designed for troubleshooting VoIP calls by extracting call details, checking SIP message completeness, detecting one-way audio issues, and calculating RTP jitter.
+A Streamlit web app for intelligent inspection of SIP signaling and RTP media streams from .pcap/.pcapng files — purpose-built to aid QA teams and developers working with Mitel Border Gateway (MBG) and MiVoice Business (MiVB) systems.
+
+It automates call flow inspection, flags missing SIP messages, detects one-way audio, and computes RTP jitter stats, offering a fast and user-friendly way to investigate call quality.
 
 ---
 
 ## Features
 
-- Parses SIP and RTP packets using [pyshark](https://github.com/KimiNewt/pyshark).
-- Extracts SIP call messages (INVITE, ACK, BYE, etc.) and highlights missing important messages.
-- Analyzes RTP streams for jitter and potential one-way audio conditions.
-- Summarizes call info including Call-ID, media IP addresses, codecs used, and RTP quality metrics.
-- Interactive Streamlit UI for uploading PCAP files and viewing detailed reports.
-- Downloadable reports in CSV and HTML formats for offline analysis.
+✅ SIP Message Extraction – INVITE, TRYING, RINGING, OK, ACK, BYE, CANCEL, OPTIONS, etc.
+
+✅ Missing SIP Detection – Flags missing ACK/BYE for each call.
+
+✅ RTP Analysis – Per-stream jitter, packet count, codec used, one-way audio flags.
+
+✅ Call Summary Table – Call-ID, From/To URIs, IPs, codecs, and media path.
+
+✅ One-Way Audio Detection – Highlights calls where only one RTP stream is present.
+
+✅ Jitter Stats – Min/Max/Mean jitter per stream (ms).
+
+✅ Interactive Web UI – Upload .pcap files, view tabular data instantly.
+
+✅ Download Reports – Export full analysis as .csv and .html.
 
 ---
 
@@ -44,20 +54,23 @@ Replace `sip_analyzer_mvp.py` with the filename of your script.
 
 ## Usage
 
-1. Open the Streamlit app in your browser.
-2. Upload a `.pcap` or `.pcapng` file containing SIP and RTP traffic.
-3. Wait for the analysis to complete.
-4. View the call summary table showing SIP messages, missing ACK/BYE flags, one-way audio detection, average RTP jitter, codecs, and media IP addresses.
-5. Download the report as CSV or HTML for further analysis or sharing.
-
+* Upload a SIP/RTP .pcap file from MBG or MiVB call captures.
+* The app will:
+  * Parse and extract SIP messages.
+  * Correlate RTP streams using SSRC and IP/port pairs.
+  * Compute jitter and detect one-way audio.
+* Review SIP call summary table:
+* Flags missing messages (ACK, BYE)
+* Shows RTP stream directions and codec info
+* Download CSV or HTML reports for sharing or offline analysis.
 ---
 
 ## Limitations and Notes
 
-- RTP streams are currently identified by SSRC and analyzed independently of SIP Call-ID.  
-- The app requires Tshark (part of Wireshark) installed and accessible in your system PATH.  
-- Large PCAP files may take longer to analyze depending on system resources.  
-- Future improvements planned include better RTP to SIP call correlation, packet loss detection, and enhanced UI filters.
+* SIP ↔ RTP mapping is based on media IPs and SSRC, not SDP correlation (future enhancement).
+* Large .pcap files (>100MB) may slow down analysis depending on system memory and CPU.
+* Currently does not compute packet loss (planned).
+* Performance may vary depending on your Tshark version and setup.
 
 ---
 
