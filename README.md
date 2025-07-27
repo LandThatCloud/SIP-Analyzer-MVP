@@ -1,6 +1,6 @@
-# SIP & RTP Analyzer (MBG/MiVB PCAP Inspector)
+# SIP & RTP Analyzer (PCAP Inspector)
 
-A Streamlit web app for intelligent inspection of SIP signaling and RTP media streams from .pcap/.pcapng files — purpose-built to aid QA teams and developers working with Mitel Border Gateway (MBG) and MiVoice Business (MiVB) systems.
+A Streamlit web app for intelligent inspection of SIP signaling and RTP media streams from .pcap/.pcapng files — purpose-built to aid QA teams and developers 
 
 It automates call flow inspection, flags missing SIP messages, detects one-way audio, and computes RTP jitter stats, offering a fast and user-friendly way to investigate call quality.
 
