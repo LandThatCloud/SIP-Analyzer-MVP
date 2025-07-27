@@ -1,84 +1,68 @@
-# SIP/SDP Log Analyzer with Anomaly Detection (PCAP-based)
-# Author: Ram Bharadwaj | Mitel Networks QA
-# Description: MVP version - parses SIP messages from .pcap, detects flow anomalies.
-
+import streamlit as st
 import pyshark
-import re
+import pandas as pd
 from collections import defaultdict
-from datetime import datetime
 
-# Define thresholds (in seconds)
-INVITE_OK_THRESHOLD = 5.0
+# Helper: Analyze SIP + RTP
+def analyze_pcap(file):
+    cap = pyshark.FileCapture(file, display_filter='sip || rtp')
+    calls = defaultdict(lambda: {"messages": [], "rtp": [], "media_ips": set(), "codecs": set()})
+    report_rows = []
 
-# Store call data
-calls = defaultdict(lambda: {
-    'messages': [],
-    'timestamps': {},
-    'codecs': [],
-    'src_ips': set(),
-    'dst_ips': set()
-})
-
-def parse_sip_packets(pcap_file):
-    print(f"[*] Parsing SIP packets from {pcap_file}...")
-    cap = pyshark.FileCapture(pcap_file, display_filter='sip')
     for pkt in cap:
-        try:
-            call_id = pkt.sip.get_field_by_showname("Call-ID") or "unknown"
-            msg = pkt.sip.request_line or pkt.sip.status_line or ""
-            ts = pkt.sniff_time
+        if 'sip' in pkt:
+            call_id = pkt.sip.get('Call-ID', 'Unknown')
+            msg = pkt.sip.get('Request-Line', '') or pkt.sip.get('Status-Line', '')
+            calls[call_id]["messages"].append(msg)
+            if hasattr(pkt.sip, 'media_ip'):
+                calls[call_id]["media_ips"].add(pkt.sip.media_ip)
+            if hasattr(pkt.sip, 'rtp_payload_type'):
+                calls[call_id]["codecs"].add(pkt.sip.rtp_payload_type)
 
-            calls[call_id]['messages'].append(msg)
-            calls[call_id]['timestamps'][msg] = ts
-            calls[call_id]['src_ips'].add(pkt.ip.src)
-            calls[call_id]['dst_ips'].add(pkt.ip.dst)
+        elif 'rtp' in pkt:
+            ssrc = pkt.rtp.get('ssrc', 'Unknown')
+            jitter = float(pkt.rtp.get('jitter', 0.0))
+            calls[ssrc]["rtp"].append(jitter)
 
-            # Extract codec from SDP if present
-            if hasattr(pkt, 'sdp'):
-                sdp_raw = pkt.sdp.get_raw_value()
-                codecs = re.findall(r"a=rtpmap:\d+ ([^/]+)", sdp_raw)
-                calls[call_id]['codecs'].extend(codecs)
+    for call_id, info in calls.items():
+        missing_ack = not any("ACK" in msg for msg in info["messages"])
+        missing_bye = not any("BYE" in msg for msg in info["messages"])
+        avg_jitter = round(sum(info["rtp"]) / len(info["rtp"]), 2) if info["rtp"] else None
+        one_way = len(info["media_ips"]) < 2
 
-        except AttributeError:
-            continue
-    cap.close()
-    return calls
+        report_rows.append({
+            "Call ID": call_id,
+            "Messages": ', '.join(info["messages"][:3]),
+            "Missing ACK": missing_ack,
+            "Missing BYE": missing_bye,
+            "One-Way Audio": one_way,
+            "Avg RTP Jitter": avg_jitter,
+            "Codecs": ', '.join(info["codecs"]),
+            "Media IPs": ' → '.join(info["media_ips"]),
+        })
 
-def analyze_call_flow():
-    for call_id, data in calls.items():
-        print(f"\n📞 Call-ID: {call_id}")
-        msgs = data['messages']
-        ts_map = data['timestamps']
-        codecs = list(set(data['codecs']))
+    return pd.DataFrame(report_rows)
 
-        def get_time_diff(msg1, msg2):
-            if msg1 in ts_map and msg2 in ts_map:
-                return (ts_map[msg2] - ts_map[msg1]).total_seconds()
-            return None
 
-        print("Messages:")
-        for m in msgs:
-            print(f"  - {m}")
+# Streamlit UI
+st.title("📞 SIP & RTP Analyzer (MBG/MiVB PCAP Inspector)")
+uploaded_file = st.file_uploader("Upload a .pcap or .pcapng file", type=['pcap', 'pcapng'])
 
-        if any("INVITE" in m for m in msgs) and any("200 OK" in m for m in msgs):
-            delay = get_time_diff([m for m in msgs if "INVITE" in m][0], [m for m in msgs if "200 OK" in m][0])
-            if delay and delay > INVITE_OK_THRESHOLD:
-                print(f"⚠️ Delay between INVITE and 200 OK: {delay:.2f}s (threshold: {INVITE_OK_THRESHOLD}s)")
-            else:
-                print(f"✅ INVITE → 200 OK delay acceptable: {delay:.2f}s")
+if uploaded_file is not None:
+    with st.spinner("Analyzing PCAP..."):
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            tmp_file.write(uploaded_file.read())
+            tmp_file_path = tmp_file.name
 
-        if "ACK" not in "".join(msgs):
-            print("❌ Missing ACK message")
-        if "BYE" not in "".join(msgs):
-            print("⚠️ BYE message not observed")
+        df = analyze_pcap(tmp_file_path)
 
-        print(f"Codecs negotiated: {codecs}")
-        print(f"Media IPs involved: {data['src_ips']} → {data['dst_ips']}")
 
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) != 2:
-        print("Usage: python sip_analyzer.py <path_to_pcap>")
-    else:
-        parse_sip_packets(sys.argv[1])
-        analyze_call_flow()
+    st.success("Analysis complete! 📊")
+    st.dataframe(df)
+
+    csv = df.to_csv(index=False)
+    html = df.to_html(index=False)
+
+    st.download_button("Download CSV", csv, "sip_rtp_report.csv", "text/csv")
+    st.download_button("Download HTML", html, "sip_rtp_report.html", "text/html")
