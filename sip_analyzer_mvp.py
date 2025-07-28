@@ -21,7 +21,16 @@ def analyze_pcap(file):
     try:
         for pkt in cap:
             if 'sip' in pkt:
-                call_id = pkt.sip.get('Call-ID', 'Unknown')
+                if exclude_options and hasattr(pkt.sip, 'Method') and pkt.sip.Method == "OPTIONS":
+                    continue
+
+                call_id = getattr(pkt.sip, 'call_id', 'UNKNOWN')
+                #future addons
+                method = getattr(pkt.sip, 'Method', getattr(pkt.sip, 'request_line', ''))
+                from_uri = getattr(pkt.sip, 'from_uri', 'N/A')
+                to_uri = getattr(pkt.sip, 'to_uri', 'N/A')
+                time = pkt.sniff_time.strftime("%H:%M:%S.%f")[:-3]
+
                 msg = pkt.sip.get('Request-Line', '') or pkt.sip.get('Status-Line', '')
                 calls[call_id]["messages"].append(msg)
                 if hasattr(pkt.sip, 'media_ip'):
@@ -73,7 +82,11 @@ def analyze_pcap(file):
 
 # Streamlit UI
 st.title("📞 SIP & RTP Analyzer (MBG/MiVB PCAP Inspector)")
-uploaded_file = st.file_uploader("Upload a .pcap or .pcapng file", type=['pcap', 'pcapng'])
+
+# UI Controls
+exclude_options = st.checkbox("Exclude SIP OPTIONS messages", value=True)
+include_media_lines = st.checkbox("Include SDP m= lines in summary", value=True)
+uploaded_file = st.file_uploader("Upload a PCAP/PCAPNG file", type=["pcap", "pcapng"])
 
 if uploaded_file is not None:
     with st.spinner("Analyzing PCAP..."):
